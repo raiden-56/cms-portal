@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.local
+.env.test.local
+*.log
+.DS_Store
+Thumbs.db
+
+# local media storage (dev driver)
+apps/api/storage/
+
+# test output
+playwright-report/
+test-results/
+test-results-*/
+.vite/
+*.tsbuildinfo

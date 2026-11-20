@@ -1,0 +1,41 @@
+{
+  "name": "meridian",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Meridian — an enterprise-grade headless content platform",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "infra:up": "docker compose up -d postgres redis",
+    "infra:down": "docker compose down",
+    "db:migrate": "npm run db:migrate -w @meridian/api",
+    "db:deploy": "npm run db:deploy -w @meridian/api",
+    "db:seed": "npm run db:seed -w @meridian/api",
+    "dev": "concurrently -n api,admin -c green,cyan \"npm run dev -w @meridian/api\" \"npm run dev -w @meridian/admin\"",
+    "dev:api": "npm run dev -w @meridian/api",
+    "dev:admin": "npm run dev -w @meridian/admin",
+    "build": "npm run build -w @meridian/sdk && npm run build -w @meridian/api && npm run build -w @meridian/admin",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e -w @meridian/admin"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "~5.9.3"
+  },
+  "allowScripts": {
+    "prisma@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.27.7": true,
+    "esbuild@0.28.2": true,
+    "sharp@0.34.5": true,
+    "msgpackr-extract@3.0.7": true
+  }
+}

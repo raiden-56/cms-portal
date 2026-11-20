@@ -1,0 +1,14 @@
+**/node_modules
+**/dist
+**/coverage
+**/.env
+**/.env.local
+**/.env.test
+**/storage
+**/storage-test
+**/playwright-report
+**/test-results
+.git
+.github
+docs
+*.md

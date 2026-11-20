@@ -1,0 +1,660 @@
+// Meridian data model.
+//
+// Tenancy:  Organization → Project → Environment → (content types, components, entries, releases, webhooks)
+//           Media, locales and API tokens belong to a Project (tokens are bound to one Environment).
+// Content:  field values live in JSONB (`Entry.data`, `Entry.publishedData`); everything
+//           structural — ownership, versions, relations, lifecycle — is relational.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ContentTypeKind {
+  COLLECTION
+  SINGLE
+}
+
+enum EntryStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum VersionKind {
+  SAVE
+  AUTOSAVE
+  PUBLISH
+  RESTORE
+}
+
+enum TokenType {
+  READ_ONLY
+  READ_WRITE
+  PREVIEW
+}
+
+enum ReleaseStatus {
+  OPEN
+  SCHEDULED
+  PUBLISHED
+  FAILED
+}
+
+enum ReleaseAction {
+  PUBLISH
+  UNPUBLISH
+}
+
+enum DeliveryStatus {
+  PENDING
+  RETRYING
+  SUCCESS
+  FAILED
+}
+
+// ─── Identity ────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  name         String
+  passwordHash String
+  isActive     Boolean   @default(true)
+  isSuperAdmin Boolean   @default(false)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions    Session[]
+  memberships Membership[]
+  preferences UserPreference[]
+  loginEvents LoginEvent[]
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LoginEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  email     String
+  success   Boolean
+  reason    String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+}
+
+model UserPreference {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @db.Uuid
+  key    String
+  value  Json
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
+
+// ─── Tenancy ─────────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String    @unique
+  settings  Json      @default("{}")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  roles       Role[]
+  memberships Membership[]
+  invitations Invitation[]
+  projects    Project[]
+  auditLogs   AuditLog[]
+}
+
+model Role {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  key            String
+  name           String
+  description    String   @default("")
+  permissions    String[]
+  isSystem       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships  Membership[]
+  invitations  Invitation[]
+
+  @@unique([organizationId, key])
+}
+
+model Membership {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  userId         String           @db.Uuid
+  roleId         String           @db.Uuid
+  status         MembershipStatus @default(ACTIVE)
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model Invitation {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  email          String
+  roleId         String    @db.Uuid
+  tokenHash      String    @unique
+  invitedById    String    @db.Uuid
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+model Project {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  name           String
+  slug           String
+  description    String    @default("")
+  icon           String    @default("layers")
+  color          String    @default("#1F6F5C")
+  settings       Json      @default("{}")
+  createdById    String    @db.Uuid
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  environments Environment[]
+  locales      Locale[]
+  apiTokens    ApiToken[]
+  mediaAssets  MediaAsset[]
+  mediaFolders MediaFolder[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, deletedAt])
+}
+
+model Environment {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  key       String
+  name      String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  contentTypes ContentType[]
+  components   Component[]
+  entries      Entry[]
+  releases     Release[]
+  webhooks     Webhook[]
+  apiTokens    ApiToken[]
+
+  @@unique([projectId, key])
+}
+
+model Locale {
+  id           String   @id @default(uuid()) @db.Uuid
+  projectId    String   @db.Uuid
+  code         String
+  name         String
+  isDefault    Boolean  @default(false)
+  fallbackCode String?
+  createdAt    DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, code])
+}
+
+// ─── Content model ───────────────────────────────────────────────────────────
+
+model ContentType {
+  id            String          @id @default(uuid()) @db.Uuid
+  environmentId String          @db.Uuid
+  apiId         String
+  displayName   String
+  singularName  String
+  pluralName    String
+  description   String          @default("")
+  kind          ContentTypeKind @default(COLLECTION)
+  icon          String          @default("document")
+  isSystem      Boolean         @default(false)
+  /// { localized, requireApproval, titleField, previewUrl }
+  options       Json            @default("{}")
+  schemaVersion Int             @default(1)
+  createdById   String?         @db.Uuid
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  environment Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  fields      Field[]
+  entries     Entry[]
+
+  @@unique([environmentId, apiId])
+}
+
+model Component {
+  id            String   @id @default(uuid()) @db.Uuid
+  environmentId String   @db.Uuid
+  apiId         String
+  displayName   String
+  description   String   @default("")
+  category      String   @default("General")
+  icon          String   @default("component")
+  /// Offered as a block in the page builder.
+  isBlock       Boolean  @default(false)
+  schemaVersion Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  environment Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  fields      Field[]
+
+  @@unique([environmentId, apiId])
+}
+
+model Field {
+  id            String  @id @default(uuid()) @db.Uuid
+  contentTypeId String? @db.Uuid
+  componentId   String? @db.Uuid
+  apiId         String
+  label         String
+  type          String
+  required      Boolean @default(false)
+  unique        Boolean @default(false)
+  localized     Boolean @default(false)
+  config        Json    @default("{}")
+  position      Int     @default(0)
+
+  contentType ContentType? @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+  component   Component?   @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  @@unique([contentTypeId, apiId])
+  @@unique([componentId, apiId])
+  @@index([contentTypeId, position])
+  @@index([componentId, position])
+}
+
+/// Append-only record of every schema change, with the computed diff and its data impact.
+model SchemaChange {
+  id            String   @id @default(uuid()) @db.Uuid
+  environmentId String   @db.Uuid
+  targetKind    String
+  targetId      String   @db.Uuid
+  targetApiId   String
+  version       Int
+  summary       String
+  diff          Json
+  userId        String?  @db.Uuid
+  createdAt     DateTime @default(now())
+
+  @@index([environmentId, createdAt])
+  @@index([targetId, version])
+}
+
+// ─── Content ─────────────────────────────────────────────────────────────────
+
+model Entry {
+  id            String @id @default(uuid()) @db.Uuid
+  environmentId String @db.Uuid
+  contentTypeId String @db.Uuid
+  /// Stable public identifier shared by every locale variant of the same document.
+  documentId    String @db.Uuid
+  locale        String
+
+  /// Denormalised display/lookup columns maintained on save.
+  title    String?
+  slug     String?
+  /// Pages only: full URL path and tree position.
+  path     String?
+  parentId String? @db.Uuid
+  position Int     @default(0)
+
+  /// Working copy. Editors always read and write this.
+  data   Json
+  status EntryStatus @default(DRAFT)
+
+  /// Live snapshot. The delivery API only ever reads these columns.
+  publishedData      Json?
+  publishedTitle     String?
+  publishedSlug      String?
+  publishedPath      String?
+  publishedVersionId String?   @db.Uuid
+  publishedAt        DateTime?
+  firstPublishedAt   DateTime?
+
+  scheduledPublishAt   DateTime?
+  scheduledUnpublishAt DateTime?
+
+  /// Optimistic concurrency counter; every write must present the current value.
+  lockVersion Int     @default(1)
+  assigneeId  String? @db.Uuid
+  createdById String? @db.Uuid
+  updatedById String? @db.Uuid
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  environment  Environment     @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  contentType  ContentType     @relation(fields: [contentTypeId], references: [id], onDelete: Cascade)
+  parent       Entry?          @relation("PageTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Entry[]         @relation("PageTree")
+  versions     EntryVersion[]
+  comments     Comment[]
+  relationsOut EntryRelation[]
+  releaseItems ReleaseItem[]
+
+  @@unique([documentId, locale])
+  @@index([environmentId, contentTypeId, deletedAt, updatedAt])
+  @@index([environmentId, contentTypeId, publishedAt])
+  @@index([environmentId, status])
+  @@index([contentTypeId, slug])
+  @@index([contentTypeId, publishedSlug])
+  @@index([environmentId, publishedPath])
+  @@index([scheduledPublishAt])
+  @@index([scheduledUnpublishAt])
+  @@index([parentId])
+  @@index([data(ops: JsonbPathOps)], type: Gin)
+  @@index([publishedData(ops: JsonbPathOps)], type: Gin)
+}
+
+model EntryVersion {
+  id          String      @id @default(uuid()) @db.Uuid
+  entryId     String      @db.Uuid
+  number      Int
+  kind        VersionKind
+  data        Json
+  title       String?
+  note        String?
+  createdById String?     @db.Uuid
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  entry Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, number])
+  @@index([entryId, createdAt])
+}
+
+/// Outgoing references from an entry's working copy, kept in sync on save.
+model EntryRelation {
+  id               String @id @default(uuid()) @db.Uuid
+  fromEntryId      String @db.Uuid
+  field            String
+  targetDocumentId String @db.Uuid
+  position         Int    @default(0)
+
+  from Entry @relation(fields: [fromEntryId], references: [id], onDelete: Cascade)
+
+  @@index([fromEntryId])
+  @@index([targetDocumentId])
+}
+
+/// Media referenced by an entry's working copy or live snapshot, kept in sync on save and publish.
+model MediaUsage {
+  id      String @id @default(uuid()) @db.Uuid
+  assetId String @db.Uuid
+  entryId String @db.Uuid
+
+  asset MediaAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, entryId])
+  @@index([entryId])
+}
+
+model Comment {
+  id         String    @id @default(uuid()) @db.Uuid
+  entryId    String    @db.Uuid
+  userId     String    @db.Uuid
+  body       String
+  kind       String    @default("comment")
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  entry Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId, createdAt])
+}
+
+model Release {
+  id            String        @id @default(uuid()) @db.Uuid
+  environmentId String        @db.Uuid
+  name          String
+  description   String        @default("")
+  status        ReleaseStatus @default(OPEN)
+  scheduledAt   DateTime?
+  publishedAt   DateTime?
+  error         String?
+  createdById   String?       @db.Uuid
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  environment Environment   @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  items       ReleaseItem[]
+
+  @@index([environmentId, status])
+  @@index([scheduledAt])
+}
+
+model ReleaseItem {
+  id        String        @id @default(uuid()) @db.Uuid
+  releaseId String        @db.Uuid
+  entryId   String        @db.Uuid
+  action    ReleaseAction @default(PUBLISH)
+  createdAt DateTime      @default(now())
+
+  release Release @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  entry   Entry   @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([releaseId, entryId])
+}
+
+// ─── Media ───────────────────────────────────────────────────────────────────
+
+model MediaFolder {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @db.Uuid
+  parentId  String?  @db.Uuid
+  name      String
+  createdAt DateTime @default(now())
+
+  project  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parent   MediaFolder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children MediaFolder[] @relation("FolderTree")
+  assets   MediaAsset[]
+
+  @@index([projectId, parentId])
+}
+
+model MediaAsset {
+  id           String    @id @default(uuid()) @db.Uuid
+  projectId    String    @db.Uuid
+  folderId     String?   @db.Uuid
+  filename     String
+  mimeType     String
+  kind         String
+  size         Int
+  width        Int?
+  height       Int?
+  storageKey   String
+  checksum     String
+  alt          String    @default("")
+  caption      String    @default("")
+  tags         String[]
+  /// Bumped when the file is replaced so cached URLs change while the id stays stable.
+  revision     Int       @default(1)
+  createdById  String?   @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  project Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  folder  MediaFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  usages  MediaUsage[]
+
+  @@index([projectId, deletedAt, createdAt])
+  @@index([projectId, checksum])
+  @@index([projectId, folderId])
+}
+
+// ─── Developer platform ──────────────────────────────────────────────────────
+
+model ApiToken {
+  id                 String    @id @default(uuid()) @db.Uuid
+  projectId          String    @db.Uuid
+  environmentId      String    @db.Uuid
+  name               String
+  description        String    @default("")
+  type               TokenType
+  /// First characters of the token, shown so people can recognise it. Never enough to use it.
+  prefix             String
+  /// SHA-256 of the full token. The token itself is shown once and never stored.
+  tokenHash          String    @unique
+  allowedOrigins     String[]
+  rateLimitPerMinute Int       @default(600)
+  expiresAt          DateTime?
+  lastUsedAt         DateTime?
+  revokedAt          DateTime?
+  createdById        String?   @db.Uuid
+  createdAt          DateTime  @default(now())
+
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environment Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([environmentId])
+}
+
+model Webhook {
+  id            String   @id @default(uuid()) @db.Uuid
+  environmentId String   @db.Uuid
+  name          String
+  url           String
+  /// Signing secret, encrypted with ENCRYPTION_KEY (AES-256-GCM).
+  secretEnc     String
+  events        String[]
+  headers       Json     @default("{}")
+  isActive      Boolean  @default(true)
+  createdById   String?  @db.Uuid
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  environment Environment       @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([environmentId])
+}
+
+model WebhookDelivery {
+  id             String         @id @default(uuid()) @db.Uuid
+  webhookId      String         @db.Uuid
+  eventId        String         @db.Uuid
+  event          String
+  payload        Json
+  status         DeliveryStatus @default(PENDING)
+  attempts       Int            @default(0)
+  responseStatus Int?
+  responseBody   String?
+  error          String?
+  durationMs     Int?
+  nextRetryAt    DateTime?
+  createdAt      DateTime       @default(now())
+  completedAt    DateTime?
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId, createdAt])
+  @@index([status])
+}
+
+/// Hourly delivery-API usage counters. Written in batches by the usage recorder.
+model ApiUsage {
+  id             String   @id @default(uuid()) @db.Uuid
+  environmentId  String   @db.Uuid
+  tokenId        String   @default("")
+  resource       String   @default("")
+  bucket         DateTime
+  requests       Int      @default(0)
+  errors         Int      @default(0)
+  latencyMsTotal Int      @default(0)
+
+  @@unique([environmentId, tokenId, resource, bucket])
+  @@index([environmentId, bucket])
+}
+
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  projectId      String?  @db.Uuid
+  environmentId  String?  @db.Uuid
+  actorType      String   @default("user")
+  actorId        String?
+  actorLabel     String?
+  action         String
+  resourceType   String
+  resourceId     String?
+  resourceLabel  String?
+  before         Json?
+  after          Json?
+  metadata       Json?
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([environmentId, createdAt])
+  @@index([resourceType, resourceId, createdAt])
+}

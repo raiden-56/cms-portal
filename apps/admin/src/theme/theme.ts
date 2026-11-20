@@ -154,19 +154,28 @@ export const theme = createTheme({
     MuiTextField: { defaultProps: { size: 'small', variant: 'outlined', fullWidth: true } },
     MuiFormControl: { defaultProps: { size: 'small' } },
     MuiSelect: { defaultProps: { size: 'small' } },
-    MuiInputLabel: { styleOverrides: { root: { fontSize: '0.8125rem' } } },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          fontSize: '0.875rem',
+          // Keeps the resting label centred in the 40px field (the default assumes a shorter one).
+          '&.MuiInputLabel-outlined.MuiInputLabel-sizeSmall:not(.MuiInputLabel-shrink)': { transform: 'translate(14px, 10px) scale(1)' },
+        },
+      },
+    },
     MuiOutlinedInput: {
       styleOverrides: {
         root: ({ theme: t }) => ({
-          borderRadius: 7,
-          fontSize: '0.8125rem',
+          borderRadius: 8,
+          fontSize: '0.875rem',
           backgroundColor: t.vars.palette.background.paper,
           '& .MuiOutlinedInput-notchedOutline': { borderColor: t.vars.palette.border.strong, transition: 'border-color 120ms' },
           '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: t.vars.palette.text.disabled },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: t.vars.palette.secondary.main, borderWidth: 1, boxShadow: `0 0 0 3px ${t.vars.palette.action.focus}` },
           '&.Mui-disabled': { backgroundColor: t.vars.palette.surface.sunken },
         }),
-        inputSizeSmall: { paddingBlock: 7.5 },
+        // 14px text with 10px above and below: single-line fields and selects are 40px tall.
+        inputSizeSmall: { paddingBlock: 10 },
       },
     },
     MuiFormHelperText: { styleOverrides: { root: { marginInline: 2, fontSize: '0.75rem' } } },
@@ -206,13 +215,28 @@ export const theme = createTheme({
     MuiSwitch: {
       defaultProps: { size: 'small' },
       styleOverrides: {
-        root: { width: 34, height: 20, padding: 0, marginInline: 6 },
-        switchBase: ({ theme: t }) => ({
-          padding: 2,
-          '&.Mui-checked': { transform: 'translateX(14px)', color: '#fff', '& + .MuiSwitch-track': { backgroundColor: t.vars.palette.secondary.main, opacity: 1 } },
+        // One geometry for every size: a 36×20 track with a 16px thumb that travels 16px.
+        // Everything is set through the root on purpose. MUI's own size styles reach the thumb and
+        // the base through the root too, so overrides on those slots lose to them — which left the
+        // thumb off-centre and pushed past the end of the track when switched on.
+        root: ({ theme: t }) => ({
+          width: 36,
+          height: 20,
+          padding: 0,
+          marginInline: 6,
+          flexShrink: 0,
+          '& .MuiSwitch-switchBase': {
+            padding: 2,
+            color: '#fff',
+            '&.Mui-checked': { transform: 'translateX(16px)', color: '#fff' },
+            '&.Mui-checked + .MuiSwitch-track': { backgroundColor: t.vars.palette.secondary.main, opacity: 1 },
+            '&.Mui-disabled': { color: '#fff' },
+            '&.Mui-disabled + .MuiSwitch-track': { opacity: 0.45 },
+            '&.Mui-focusVisible + .MuiSwitch-track': { boxShadow: `0 0 0 3px ${t.vars.palette.action.focus}` },
+          },
+          '& .MuiSwitch-thumb': { width: 16, height: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.25)' },
+          '& .MuiSwitch-track': { borderRadius: 10, backgroundColor: t.vars.palette.border.strong, opacity: 1 },
         }),
-        thumb: { width: 16, height: 16, boxShadow: '0 1px 2px rgba(0,0,0,0.25)' },
-        track: ({ theme: t }) => ({ borderRadius: 10, backgroundColor: t.vars.palette.border.strong, opacity: 1 }),
       },
     },
     MuiCheckbox: { defaultProps: { size: 'small', color: 'secondary' } },
@@ -237,6 +261,14 @@ export const theme = createTheme({
     MuiBreadcrumbs: { styleOverrides: { separator: { marginInline: 6 } } },
     MuiDivider: { styleOverrides: { root: ({ theme: t }) => ({ borderColor: t.vars.palette.border.subtle }) } },
     MuiLink: { defaultProps: { underline: 'hover', color: 'secondary' } },
-    MuiAutocomplete: { defaultProps: { size: 'small' }, styleOverrides: { paper: { borderRadius: 9 }, option: { fontSize: '0.8125rem', minHeight: 32 } } },
+    MuiAutocomplete: {
+      defaultProps: { size: 'small' },
+      styleOverrides: {
+        // Same 40px height as other fields (the component pads its own input differently).
+        root: { '& .MuiOutlinedInput-root.MuiInputBase-sizeSmall': { paddingBlock: 7.5 } },
+        paper: { borderRadius: 9 },
+        option: { fontSize: '0.8125rem', minHeight: 32 },
+      },
+    },
   },
 });

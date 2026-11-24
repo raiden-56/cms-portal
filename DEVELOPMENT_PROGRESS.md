@@ -1,6 +1,6 @@
 # Development progress
 
-Product name: **Meridian**. Updated at the end of the fourth session (browser tests extended to 62; production bundle repaired).
+Product name: **Meridian**. Updated in the fifth session (guest mode, GitHub Pages demo, switch and text-field fixes). Code: https://github.com/raiden-56/cms-portal · Live demo (guest mode): https://raiden-56.github.io/cms-portal/
 
 ## Status at a glance
 
@@ -11,6 +11,7 @@ Product name: **Meridian**. Updated at the end of the fourth session (browser te
 | Admin: all 30 screens | **Built.** Every screen compiles and loads with real data; see "How the admin was verified" for what was and was not exercised |
 | Docker, CI, documentation | Built. API image verified by running it; admin image not built yet |
 | Browser end-to-end tests | **Written and passing** — 62 tests in 7 files, against the dev server and against the production build; see "End-to-end coverage" for what they do and do not reach |
+| Guest mode and GitHub Pages demo | **Built and tested** — see "Guest mode" |
 
 ## Test results (last run)
 
@@ -19,13 +20,38 @@ Product name: **Meridian**. Updated at the end of the fourth session (browser te
 | `apps/api` integration tests (real PostgreSQL + Redis, isolated schema) | **60 passed** (7 files) |
 | `packages/shared` unit tests | **21 passed** |
 | `packages/sdk` unit tests | **16 passed** |
-| `apps/admin` unit tests (form engine, page-editor state, formatters) | **22 passed** |
+| `apps/admin` unit tests (form engine, page-editor state, formatters, demo backend) | **40 passed** |
+| Guest-mode browser tests (`e2e-demo`, no API running; any request leaving the page's origin fails the test) | **51 passed** |
 | TypeScript: api, sdk, shared, admin | clean |
 | Admin production build (`vite build`) | succeeds, and the built app now loads and works in a browser (it did not before the fourth session — see below) |
 | API Docker image | builds; container applied migrations and answered `/health` as a non-root user |
 | Playwright end-to-end (62 tests in 7 files, Edge) | **62 passed** — two consecutive full runs against the dev server, and one full run against the production build served by `vite preview` |
 
 The spec's 18 critical scenarios are all covered by the API integration tests (organization → project → content type → fields → content → media → draft → preview → approve → publish → REST → GraphQL → update → new version live → webhook delivery → connected-frontend revalidation through the SDK → permission restrictions → restore a version). The browser tests repeat that chain through the real UI, now including the approval flow and permission restrictions; preview tokens, GraphQL and SDK revalidation are exercised through the API only.
+
+## Guest mode
+
+The admin can run with no server: a demo backend in the browser (`apps/admin/src/demo`) answers every management-API and delivery-API call, seeded with an organization, project, content types, entries in every state, pages, media, a release, API keys, webhooks, members, audit history and 30 days of analytics. A guest's changes are kept in IndexedDB in their own browser only; nothing is sent over the network.
+
+- **Entering:** "Explore as guest" on the sign-in page. A build with `VITE_DEMO_ONLY=true` starts in guest mode and has no sign-in. A banner offers "Reset demo data" and, outside a demo-only build, "Exit guest mode".
+- **Works in the browser:** every screen and action, including publishing, approval, versions, scheduling, releases, media upload/replace, delivery-API requests from the explorer and integration wizard, API keys, roles, members and audit log. The server's rules (validation on publish, optimistic locking, approval before publish, destructive schema confirmation, last-administrator protection, drafts and private fields never delivered) are ported from the API.
+- **Simulated, and labelled so:** webhook deliveries (marked "Simulated"; nothing is sent).
+- **Not available, with a message saying so:** GraphQL, password change, session revocation, real sign-in and invitations.
+- **Limits:** 5 MB per uploaded file, 60 MB library; two tabs on the same demo overwrite each other; the demo backend trusts the UI's role checks rather than checking permissions itself.
+
+### Hosting the demo on GitHub Pages
+
+```powershell
+npm run build:pages -w @meridian/admin
+```
+
+This builds a guest-only site for the `/cms-portal/` sub-path into `apps/admin/dist` (set `PAGES_BASE` for another path), with `404.html` so deep links work and `.nojekyll`. Publish the contents of `dist` (without `*.map` files) to the `gh-pages` branch. The current site was published that way by hand; there is no workflow that redeploys it on push yet.
+
+## Fixed in the fifth session
+
+- **Switch:** the thumb sat off-centre and ran past the end of the track when switched on. MUI's size styles outranked the theme's overrides; the geometry is now set through the switch root.
+- **Text fields** were about 34px tall with 13px text; single-line fields, selects and autocompletes are now 40px with 14px text.
+- **Sub-path hosting:** the router, "not found" buttons and the reload after renaming an organization assumed the app was served from `/`.
 
 ## Backend (built and tested)
 
@@ -115,6 +141,7 @@ Two other test failures were mistakes in the tests, not the app: a hero block is
 
 ## Next steps
 
+1. Add a GitHub Actions workflow that runs `build:pages` and redeploys the demo on every push to `main` (today it is published by hand).
 1. Run the browser tests in CI, against the production build (the workflow currently runs type-checks, unit/integration tests and the builds, but not Playwright — which is how a build that could not load went unnoticed).
 2. Build the admin Docker image and run the full Compose profile once. The image is meant to serve the production build — the bundle that could not load until this session — and it has still never been built or run.
 3. Add the "promote content model" dialog to Settings → Environments (API and tests exist).

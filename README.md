@@ -8,6 +8,8 @@ A headless content platform: model content without code, build pages visually, r
 - **Delivery API** — generated REST and GraphQL endpoints, filtering, sorting, relation population, locales, image transformations, OpenAPI, and a TypeScript SDK. Published content is available the moment it is published; drafts never leave through a public endpoint.
 - **Multi-tenant by construction** — organizations → projects → environments, with role-based permissions enforced on the server for every request.
 
+> **Try it without installing anything:** https://raiden-56.github.io/cms-portal/ — the admin in guest mode, with demo data kept only in your browser.
+>
 > Current status, test results and what is not built yet: [`DEVELOPMENT_PROGRESS.md`](DEVELOPMENT_PROGRESS.md).
 
 ## Quick start

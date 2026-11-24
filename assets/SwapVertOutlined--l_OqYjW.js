@@ -1,0 +1,2 @@
+import{c as h,j as t}from"./index-T0LZ5PpG.js";const V=h(t.jsx("path",{d:"M16 17.01V10h-2v7.01h-3L15 21l4-3.99zM9 3 5 6.99h3V14h2V6.99h3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99zM9 3 5 6.99h3V14h2V6.99h3z"}));export{V as S};
+//# sourceMappingURL=SwapVertOutlined--l_OqYjW.js.map

@@ -1,0 +1,2 @@
+import{c as h,j as e}from"./index-T0LZ5PpG.js";const s=h(e.jsx("path",{d:"M14.12 10.47 12 12.59l-2.13-2.12-1.41 1.41L10.59 14l-2.12 2.12 1.41 1.41L12 15.41l2.12 2.12 1.41-1.41L13.41 14l2.12-2.12zM15.5 4l-1-1h-5l-1 1H5v2h14V4zM6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6zM8 9h8v10H8z"})),l=h(e.jsx("path",{d:"m15.5 4-1-1h-5l-1 1H5v2h14V4zM6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6zm2-5V9h8v10H8zm2 4h4v-4h2l-4-4-4 4h2z"}));export{s as D,l as R};
+//# sourceMappingURL=RestoreFromTrashOutlined-CO5ByBex.js.map

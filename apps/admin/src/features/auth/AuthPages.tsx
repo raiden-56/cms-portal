@@ -7,6 +7,7 @@ import { z } from 'zod';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Link from '@mui/material/Link';
@@ -16,6 +17,7 @@ import Typography from '@mui/material/Typography';
 import VisibilityOffOutlined from '@mui/icons-material/VisibilityOffOutlined';
 import VisibilityOutlined from '@mui/icons-material/VisibilityOutlined';
 import { FormError } from '@/components/ui';
+import { useEnterGuestMode } from '@/features/guest/guest';
 import { ApiError, type AuthPayload, api, setAccessToken } from '@/lib/api';
 import { signedIn, useAppDispatch } from '@/store';
 
@@ -157,6 +159,8 @@ export function LoginPage() {
   const config = useQuery({ queryKey: ['auth-config'], queryFn: () => api.get<{ allowRegistration: boolean }>('/auth/config'), staleTime: Infinity });
   const form = useForm<LoginValues>({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } });
   const login = useMutation({ mutationFn: (values: LoginValues) => api.post<AuthPayload>('/auth/login', values), onSuccess: signIn });
+  const enterGuestMode = useEnterGuestMode();
+  const guest = useMutation({ mutationFn: enterGuestMode });
 
   return (
     <AuthLayout
@@ -183,6 +187,14 @@ export function LoginPage() {
           </Button>
         </Stack>
       </form>
+      <Divider sx={{ my: 5, color: 'text.disabled', fontSize: '0.75rem' }}>or</Divider>
+      <FormError error={guest.error} />
+      <Button fullWidth variant="outlined" size="large" loading={guest.isPending} onClick={() => guest.mutate()}>
+        Explore as guest
+      </Button>
+      <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 2, textAlign: 'center' }}>
+        No account needed. A demo workspace opens in this browser — nothing you do in it is sent to a server.
+      </Typography>
     </AuthLayout>
   );
 }

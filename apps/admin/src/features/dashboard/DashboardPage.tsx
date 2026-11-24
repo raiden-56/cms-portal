@@ -39,6 +39,7 @@ import { IconFor } from '@/components/icons';
 import { CardSkeleton, EmptyState, ErrorState, Page, PageHeader, RelativeTime, StatusChip, UserAvatar } from '@/components/ui';
 import { api } from '@/lib/api';
 import { actionVerb, compactNumber, formatBytes } from '@/lib/format';
+import { isGuestMode } from '@/lib/guest';
 import type { DashboardData, DashboardEntry } from '@/lib/types';
 import { toast } from '@/store';
 
@@ -286,17 +287,28 @@ export default function DashboardPage() {
         span: 4,
         node: (
           <ListCard title="System health">
-            <Box sx={{ px: 5, py: 2 }}>
-              <HealthRow label="Database" ok={data.health.database.ok} detail={`${data.health.database.latencyMs} ms`} />
-              <HealthRow label="Cache and queues" ok={data.health.cache.ok} detail={`${data.health.cache.latencyMs} ms`} />
-              <HealthRow label={`Media storage (${data.health.storage.driver})`} ok={data.health.storage.ok} detail={`${data.health.storage.latencyMs} ms`} />
-              <HealthRow
-                label="Webhook deliveries"
-                ok={data.health.queue.failed === 0}
-                detail={`${data.health.queue.waiting + data.health.queue.active + data.health.queue.delayed} queued`}
-              />
-              <HealthRow label="Real-time connections" ok detail={`${data.health.realtimeClients} connected`} />
-            </Box>
+            {isGuestMode() ? (
+              // Guest mode has no services to probe, and must not show green lights for a database that does not exist.
+              <Box sx={{ px: 5, py: 2 }}>
+                <HealthRow label="Demo backend" ok detail="runs in this browser" />
+                <HealthRow label="Demo data" ok={data.health.storage.driver !== 'memory only'} detail={data.health.storage.driver} />
+                <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 2, mb: 1 }}>
+                  Guest mode has no database, queue, webhook sender or real-time service to monitor.
+                </Typography>
+              </Box>
+            ) : (
+              <Box sx={{ px: 5, py: 2 }}>
+                <HealthRow label="Database" ok={data.health.database.ok} detail={`${data.health.database.latencyMs} ms`} />
+                <HealthRow label="Cache and queues" ok={data.health.cache.ok} detail={`${data.health.cache.latencyMs} ms`} />
+                <HealthRow label={`Media storage (${data.health.storage.driver})`} ok={data.health.storage.ok} detail={`${data.health.storage.latencyMs} ms`} />
+                <HealthRow
+                  label="Webhook deliveries"
+                  ok={data.health.queue.failed === 0}
+                  detail={`${data.health.queue.waiting + data.health.queue.active + data.health.queue.delayed} queued`}
+                />
+                <HealthRow label="Real-time connections" ok detail={`${data.health.realtimeClients} connected`} />
+              </Box>
+            )}
           </ListCard>
         ),
       },

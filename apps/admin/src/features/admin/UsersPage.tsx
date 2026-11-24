@@ -37,6 +37,7 @@ import { useWorkspace } from '@/app/workspace';
 import { useConfirm } from '@/components/feedback';
 import { CopyButton, EmptyState, ErrorState, FormError, Mono, Page, PageHeader, Pill, RelativeTime, SearchInput, Section, TableSkeleton, UserAvatar } from '@/components/ui';
 import { ApiError, api, errorMessage } from '@/lib/api';
+import { GuestNote } from '@/features/guest/guest';
 import { shortDate } from '@/lib/format';
 import type { Invitation, Member, Role } from '@/lib/types';
 import { toast, useAppSelector } from '@/store';
@@ -93,6 +94,9 @@ function InviteDialog({ open, onClose, roles, orgBase, orgName, onInvited }: { o
             <Alert severity="info" sx={{ mt: 4 }}>
               The link works once, expires on {shortDate(created.expiresAt)} (7 days), and is shown only now. They will join as {created.role.name}.
             </Alert>
+            <GuestNote sx={{ mt: 3 }}>
+              Guest mode: this invitation exists only in your browser. Nobody else can open the link, and no account can be created without a server.
+            </GuestNote>
           </DialogContent>
           <DialogActions>
             <Button onClick={reset}>Invite someone else</Button>

@@ -1,5 +1,5 @@
 import { type ReactNode, lazy } from 'react';
-import { Navigate, Outlet, createBrowserRouter, isRouteErrorResponse, useLocation, useRouteError } from 'react-router-dom';
+import { Link as RouterLink, Navigate, Outlet, createBrowserRouter, isRouteErrorResponse, useLocation, useRouteError } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -9,6 +9,8 @@ import SearchOffOutlined from '@mui/icons-material/SearchOffOutlined';
 import { EmptyState, ErrorState } from '@/components/ui';
 import { AcceptInvitePage, LoginPage, RegisterPage, returnPath } from '@/features/auth/AuthPages';
 import { useSignOut } from '@/features/auth/useSignOut';
+import { GuestEntry } from '@/features/guest/guest';
+import { DEMO_ONLY } from '@/lib/guest';
 import { useAppSelector } from '@/store';
 import { AppShell } from './shell';
 import { WorkspaceProvider, useWorkspace } from './workspace';
@@ -64,6 +66,8 @@ function RequireAuth({ children }: { children: ReactNode }) {
 function PublicOnly({ children }: { children: ReactNode }) {
   const status = useAppSelector((s) => s.auth.status);
   const location = useLocation();
+  // A demo-only build has no server to sign in to: these addresses open the guest workspace.
+  if (DEMO_ONLY) return <GuestEntry />;
   if (status === 'restoring') return <Splash />;
   // Signing in flips the status while the sign-in page is still mounted, so this redirect runs
   // alongside the form's own. Both must agree on the destination, or this one wins and the page
@@ -96,7 +100,7 @@ function ProjectGuard() {
         title="Project not found"
         description="This project or environment does not exist, or you no longer have access to it."
         action={
-          <Button variant="contained" href={ws.orgHref('projects')}>
+          <Button variant="contained" component={RouterLink} to={ws.orgHref('projects')}>
             View projects
           </Button>
         }
@@ -114,7 +118,7 @@ function NotFound() {
         title="Page not found"
         description="The address may be mistyped, or the page may have moved."
         action={
-          <Button variant="contained" href="/">
+          <Button variant="contained" component={RouterLink} to="/">
             Back to Meridian
           </Button>
         }
@@ -190,10 +194,11 @@ function WorkspaceLayout() {
   );
 }
 
-export const router = createBrowserRouter([
+export const router = createBrowserRouter(
+  [
   { path: '/login', element: <PublicOnly><LoginPage /></PublicOnly> },
   { path: '/register', element: <PublicOnly><RegisterPage /></PublicOnly> },
-  { path: '/accept-invite', element: <AcceptInvitePage /> },
+  { path: '/accept-invite', element: DEMO_ONLY ? <GuestEntry /> : <AcceptInvitePage /> },
   { path: '/no-organization', element: <RequireAuth><NoOrganization /></RequireAuth> },
   { path: '/', element: <RequireAuth><HomeRedirect /></RequireAuth> },
   {
@@ -248,4 +253,7 @@ export const router = createBrowserRouter([
     ],
   },
   { path: '*', element: <NotFound /> },
-]);
+  ],
+  // Lets the app be served from a sub-path (GitHub Pages serves it under /<repository>/).
+  { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || undefined },
+);

@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // "/" unless the app is hosted under a sub-path, e.g. VITE_BASE=/cms-portal/ for GitHub Pages.
+  base: process.env.VITE_BASE || '/',
   plugins: [react()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {

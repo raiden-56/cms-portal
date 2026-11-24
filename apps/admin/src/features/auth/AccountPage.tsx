@@ -29,6 +29,7 @@ import { useConfirm } from '@/components/feedback';
 import { EmptyState, ErrorState, FormError, Mono, Page, PageHeader, Pill, RelativeTime, Section, TableSkeleton, UserAvatar } from '@/components/ui';
 import { ApiError, type AuthPayload, api } from '@/lib/api';
 import { fullDateTime, shortDate } from '@/lib/format';
+import { GuestNote } from '@/features/guest/guest';
 import type { SessionInfo } from '@/lib/types';
 import { signedIn, store, toast, useAppSelector } from '@/store';
 
@@ -401,6 +402,9 @@ export default function AccountPage() {
   return (
     <Page width={920}>
       <PageHeader title="Account & security" description="Your profile, password and the devices signed in to your account." />
+      <GuestNote sx={{ mb: 5 }}>
+        Guest mode: you can rename the guest, but there is no account on a server behind it. Changing the password and signing out other devices are not available, and the only session is this browser.
+      </GuestNote>
       <Stack spacing={5}>
         <ProfileSection />
         <PasswordSection />

@@ -34,7 +34,9 @@ import { useProject } from '@/app/workspace';
 import { useConfirm } from '@/components/feedback';
 import { CopyButton, ErrorState, Mono, RelativeTime, StatusChip, useCopy, useDebounced } from '@/components/ui';
 import { ApiError, api, errorMessage } from '@/lib/api';
+import { GuestNote } from '@/features/guest/guest';
 import { fullDateTime } from '@/lib/format';
+import { isGuestMode, loadDemo } from '@/lib/guest';
 import type { MediaAsset, MediaFolder, MediaUsage } from '@/lib/types';
 import { toast } from '@/store';
 
@@ -193,18 +195,27 @@ function TransformPanel({ asset }: { asset: MediaAsset }) {
 
   useEffect(() => setNatural(null), [previewUrl]);
 
+  const guest = isGuestMode();
   const variant = useQuery({
     queryKey: ['media-variant', previewUrl],
-    queryFn: async () => {
+    queryFn: async (): Promise<{ size: number; src: string }> => {
+      if (guest) {
+        // There is no media service in guest mode: the browser renders the variant itself.
+        const rendered = await (await loadDemo()).transformImage(previewUrl);
+        return { size: rendered.size, src: rendered.url };
+      }
       const res = await fetch(previewUrl);
       if (!res.ok) throw new Error(`The media service answered ${res.status}`);
-      return (await res.blob()).size;
+      return { size: (await res.blob()).size, src: previewUrl };
     },
     enabled: active && previewUrl === url,
     staleTime: Infinity,
     retry: false,
   });
-  const saving = variant.data !== undefined && asset.size > 0 ? Math.round((1 - variant.data / asset.size) * 100) : null;
+  const variantSize = variant.data?.size;
+  // The server's variant has its own URL; a guest-mode variant only exists once the browser has rendered it.
+  const variantSrc = guest ? variant.data?.src : previewUrl;
+  const saving = variantSize !== undefined && asset.size > 0 ? Math.round((1 - variantSize / asset.size) * 100) : null;
 
   return (
     <Box>
@@ -299,11 +310,11 @@ function TransformPanel({ asset }: { asset: MediaAsset }) {
               <Typography variant="body2" color="error" sx={{ p: 4, textAlign: 'center' }}>
                 {errorMessage(variant.error, 'This variant could not be generated.')}
               </Typography>
-            ) : (
+            ) : !variantSrc ? null : (
               <Box
                 component="img"
-                key={previewUrl}
-                src={previewUrl}
+                key={variantSrc}
+                src={variantSrc}
                 alt={`Preview of ${asset.filename} with the chosen transformation`}
                 onLoad={(e: React.SyntheticEvent<HTMLImageElement>) => setNatural({ width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })}
                 sx={{ maxWidth: '100%', maxHeight: 300, display: 'block', objectFit: 'contain' }}
@@ -313,11 +324,14 @@ function TransformPanel({ asset }: { asset: MediaAsset }) {
           </Box>
           <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 1.5, fontVariantNumeric: 'tabular-nums' }} aria-live="polite">
             {natural ? `${natural.width} × ${natural.height} px` : 'Generating…'}
-            {variant.data !== undefined && ` · ${formatBytes(variant.data)}`}
+            {variantSize !== undefined && ` · ${formatBytes(variantSize)}`}
             {saving !== null && saving > 0 && ` · ${saving}% smaller than the original`}
             {saving !== null && saving < 0 && ` · ${Math.abs(saving)}% larger than the original`}
           </Typography>
-          <Stack direction="row" spacing={1} sx={{ mt: 2, alignItems: 'center', border: 1, borderColor: 'border.subtle', borderRadius: '8px', bgcolor: 'surface.subtle', pl: 2.5, pr: 1, py: 1 }}>
+          <GuestNote sx={{ mt: 2 }}>
+            Guest mode renders this variant in your browser, so it has no address to copy, smart cropping falls back to the centre, and only formats this browser can encode are available. On a server every variant has its own cacheable URL.
+          </GuestNote>
+          <Stack direction="row" spacing={1} sx={{ mt: 2, alignItems: 'center', border: 1, borderColor: 'border.subtle', borderRadius: '8px', bgcolor: 'surface.subtle', pl: 2.5, pr: 1, py: 1, display: guest ? 'none' : 'flex' }}>
             <Mono sx={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</Mono>
             <Tooltip title={copied ? 'Copied' : 'Copy variant URL'}>
               <IconButton size="small" aria-label="Copy variant URL" onClick={() => copy(url)}>
@@ -550,7 +564,7 @@ export function AssetDrawer({ assetId, onClose, folders, knownTags, onChanged }:
               <Button variant="outlined" size="small" startIcon={copied ? <CheckOutlined /> : <LinkOutlined />} onClick={() => copy(asset.url)}>
                 {copied ? 'Copied' : 'Copy URL'}
               </Button>
-              <Button variant="outlined" size="small" startIcon={<FileDownloadOutlined />} component="a" href={`${asset.url}?download=true`}>
+              <Button variant="outlined" size="small" startIcon={<FileDownloadOutlined />} component="a" href={`${asset.url}?download=true`} download={asset.filename}>
                 Download
               </Button>
               {canManage && !trashed && (

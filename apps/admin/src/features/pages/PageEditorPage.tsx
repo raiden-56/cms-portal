@@ -33,6 +33,7 @@ import { Outline } from './editor/Outline';
 import { Palette } from './editor/Palette';
 import { type SaveState, Toolbar } from './editor/Toolbar';
 import { PAGES_TYPE, joinPagePath, useInvalidatePages, usePageEntry } from './hooks';
+import { isGuestMode } from '@/lib/guest';
 
 const NO_ASSETS = new Map<string, MediaAsset>();
 const LEFT_WIDTH = 272;
@@ -484,6 +485,11 @@ function Editor({ entry, schema }: { entry: EntryDetail; schema: SchemaResponse 
     return api.post<{ token: string; apiUrl: string; previewUrl: string | null; expiresIn: number }>(`${ws.envBase}/entry/${entryId}/preview-token`, {});
   };
   const previewDraft = () => {
+    if (isGuestMode()) {
+      // A preview opens the project's own website with a token for the API. Guest mode has neither a website nor a server.
+      toast.info('Guest mode has no website or server to open a preview in. The canvas shows the draft; a real project opens it in your frontend.');
+      return;
+    }
     // Opened synchronously so the browser treats it as a user-initiated tab, then pointed at the preview.
     const tab = window.open('', '_blank');
     void previewToken()

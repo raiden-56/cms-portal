@@ -35,6 +35,8 @@ import UnfoldMoreOutlined from '@mui/icons-material/UnfoldMoreOutlined';
 import { IconFor } from '@/components/icons';
 import { EmptyState, RelativeTime, StatusChip, UserAvatar } from '@/components/ui';
 import { useSignOut } from '@/features/auth/useSignOut';
+import { GuestBanner } from '@/features/guest/guest';
+import { DEMO_ONLY, isGuestMode } from '@/lib/guest';
 import { api } from '@/lib/api';
 import { actionVerb } from '@/lib/format';
 import type { DashboardData, EntryListItem } from '@/lib/types';
@@ -447,13 +449,16 @@ function UserMenu() {
             ))}
           </Stack>
         </Box>
-        <Divider sx={{ my: 1 }} />
-        <MenuItem onClick={() => void signOut()}>
-          <ListItemIcon>
-            <LogoutOutlined />
-          </ListItemIcon>
-          Sign out
-        </MenuItem>
+        {/* A demo-only build has nothing to sign out to; resetting lives in the guest banner. */}
+        {!DEMO_ONLY && <Divider sx={{ my: 1 }} />}
+        {!DEMO_ONLY && (
+          <MenuItem onClick={() => void signOut()}>
+            <ListItemIcon>
+              <LogoutOutlined />
+            </ListItemIcon>
+            {isGuestMode() ? 'Exit guest mode' : 'Sign out'}
+          </MenuItem>
+        )}
       </Menu>
     </>
   );
@@ -567,6 +572,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
           </Drawer>
         )}
         <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <GuestBanner />
           <Topbar crumbs={crumbs} />
           <Box component="main" id="main" sx={{ flex: 1, minHeight: 0, overflow: 'auto', position: 'relative' }}>
             <Suspense fallback={<ContentFallback />}>{children ?? <Outlet />}</Suspense>

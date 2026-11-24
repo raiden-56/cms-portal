@@ -44,6 +44,7 @@ import type { ApiToken } from '@/lib/types';
 import { toast } from '@/store';
 import { EnvironmentLabel, NoAccess, OriginsEditor, SecretRevealDialog, TOKEN_TYPE_INFO, TokenTypePill, useTokens } from './shared';
 import { snippetContext } from './snippets';
+import { GuestNote } from '@/features/guest/guest';
 
 const EXPIRY_OPTIONS = [
   { value: 0, label: 'Never' },
@@ -547,6 +548,9 @@ export default function ApiKeysPage() {
       >
         {revealed && (
           <>
+            <GuestNote sx={{ mb: 3 }}>
+              Guest mode: this key was generated in your browser and works only inside it — try it in the API explorer. No server knows it, so the command below would be refused by a real API.
+            </GuestNote>
             <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
               Try it
             </Typography>

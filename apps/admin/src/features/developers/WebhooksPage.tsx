@@ -38,6 +38,8 @@ import { api, errorMessage } from '@/lib/api';
 import type { Webhook } from '@/lib/types';
 import { toast } from '@/store';
 import { DeliveryStatusPill, NoAccess, SecretRevealDialog, Snippets, useWebhooks } from './shared';
+import { GuestNote } from '@/features/guest/guest';
+import { isGuestMode } from '@/lib/guest';
 import { NEXT_REVALIDATE_ROUTE, NODE_VERIFY } from './snippets';
 import { WEBHOOK_PRESETS, WebhookFormDialog, type WebhookPreset } from './WebhookForm';
 
@@ -131,7 +133,7 @@ export default function WebhooksPage() {
     onSuccess: async (_, webhook) => {
       await refresh();
       await queryClient.invalidateQueries({ queryKey: ['webhook-deliveries', webhook.id] });
-      toast.success('Test event queued', { label: 'View deliveries', href: ws.href(`dev/webhooks/${webhook.id}`) });
+      toast.success(isGuestMode() ? 'Simulated test delivery recorded — nothing was sent' : 'Test event queued', { label: 'View deliveries', href: ws.href(`dev/webhooks/${webhook.id}`) });
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -177,6 +179,10 @@ export default function WebhooksPage() {
           </Button>
         }
       />
+
+      <GuestNote sx={{ mb: 4 }}>
+        Guest mode cannot call your endpoint: there is no server to send from. The delivery history is sample data, and publishing, “Send test” and redelivery only record a simulated delivery, labelled as such.
+      </GuestNote>
 
       <Paper sx={{ borderRadius: '10px', overflow: 'hidden', mb: 5 }}>
         {webhooks.isLoading ? (
@@ -233,7 +239,7 @@ export default function WebhooksPage() {
                       <TableCell>
                         {webhook.lastDelivery ? (
                           <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                            <DeliveryStatusPill status={webhook.lastDelivery.status} />
+                            <DeliveryStatusPill status={webhook.lastDelivery.status} simulated={webhook.lastDelivery.simulated} />
                             <Typography variant="caption" color="text.secondary">
                               <RelativeTime value={webhook.lastDelivery.createdAt} />
                             </Typography>

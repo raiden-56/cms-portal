@@ -172,7 +172,8 @@ function OrganizationTab() {
     onSuccess: async (updated) => {
       if (updated.slug !== ws.org.slug) {
         // Every in-app address contains the organization URL, so start again from the new one.
-        window.location.assign(`/w/${updated.slug}/admin/settings?tab=organization`);
+        // A full reload, so the app picks up the new address; keeps any sub-path the app is served from.
+        window.location.assign(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/w/${updated.slug}/admin/settings?tab=organization`);
         return;
       }
       toast.success('Organization settings saved');

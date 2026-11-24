@@ -289,7 +289,8 @@ export interface Webhook {
   createdAt: string;
   updatedAt: string;
   deliveries7d?: { success: number; failed: number; pending: number };
-  lastDelivery?: { status: string; createdAt: string; responseStatus: number | null } | null;
+  /** `simulated` is set by guest mode, where deliveries are recorded but never sent. */
+  lastDelivery?: { status: string; createdAt: string; responseStatus: number | null; simulated?: boolean } | null;
   secret?: string;
 }
 

@@ -6,6 +6,8 @@
  * the session itself is gone.
  */
 
+import { isGuestMode, loadDemo } from './guest';
+
 export const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? 'http://localhost:4000';
 const ADMIN_BASE = `${API_URL}/admin/api`;
 
@@ -82,10 +84,13 @@ function toError(res: Response, body: any): ApiError {
 /** Exchanges the session cookie for a fresh access token. Concurrent callers share one request. */
 export function refreshSession(): Promise<AuthPayload | null> {
   if (!refreshing) {
-    refreshing = fetch(`${ADMIN_BASE}/auth/refresh`, { method: 'POST', credentials: 'include', headers: { 'X-Meridian-Client': 'admin' } })
-      .then(async (res) => {
-        if (!res.ok) return null;
-        const payload = (await res.json()) as AuthPayload;
+    const exchange: Promise<AuthPayload | null> = isGuestMode()
+      ? // Guest mode has no cookie and no server: the session is the demo data in this browser.
+        loadDemo().then((demo) => demo.startSession())
+      : fetch(`${ADMIN_BASE}/auth/refresh`, { method: 'POST', credentials: 'include', headers: { 'X-Meridian-Client': 'admin' } }).then(async (res) => (res.ok ? ((await res.json()) as AuthPayload) : null));
+    refreshing = exchange
+      .then((payload) => {
+        if (!payload) return null;
         accessToken = payload.accessToken;
         onRefreshed?.(payload);
         return payload;
@@ -116,7 +121,21 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
   return url.toString();
 }
 
+const demoError = (status: number, body: any, fallback: string) => new ApiError(status, body?.error?.code ?? 'error', body?.error?.message ?? `${fallback} (${status})`, body?.error?.details, body?.error?.requestId);
+
+/** Guest mode: the request is answered by the in-browser demo backend. Nothing is sent over the network. */
+async function sendToDemo(method: string, path: string, opts: RequestOptions): Promise<any> {
+  const demo = await loadDemo();
+  const res = await demo.request({ method, path, query: opts.query, body: opts.body });
+  if (!res.ok) throw demoError(res.status, res.body, 'Request failed');
+  if (!opts.raw) return res.body;
+  // `download` expects a fetch Response; build one from the generated file.
+  const content = typeof res.body === 'string' ? res.body : JSON.stringify(res.body, null, 2);
+  return new Response(content, { status: res.status, headers: res.headers });
+}
+
 async function send(method: string, path: string, opts: RequestOptions, retried = false): Promise<any> {
+  if (isGuestMode()) return sendToDemo(method, path, opts);
   const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData;
   const headers: Record<string, string> = { 'X-Meridian-Client': 'admin' };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
@@ -165,6 +184,15 @@ export const api = {
 
   /** Multipart upload with progress reporting. */
   upload<T>(path: string, form: FormData, onProgress?: (fraction: number) => void, query?: RequestOptions['query']): Promise<T> {
+    if (isGuestMode()) {
+      // The files are read and kept in this browser; progress reports the reading.
+      return loadDemo()
+        .then((demo) => demo.upload(path, form, query, onProgress))
+        .then((res) => {
+          if (res.ok || ((res.body as any)?.errors && (res.body as any)?.items)) return res.body as T;
+          throw demoError(res.status, res.body, 'Upload failed');
+        });
+    }
     const attempt = (retried: boolean): Promise<T> =>
       new Promise<T>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -201,6 +229,13 @@ export const api = {
 /** Calls the public delivery API with an API token (used by the API explorer and the integration wizard). */
 export async function deliveryFetch(path: string, token: string, init: { method?: string; body?: unknown } = {}) {
   const started = performance.now();
+  if (isGuestMode()) {
+    // Demo keys are only known to the in-browser backend, which also answers the request.
+    const demo = await loadDemo();
+    const answer = await demo.delivery(path, token, init);
+    const size = answer.body === null ? 0 : JSON.stringify(answer.body).length;
+    return { status: answer.status, ok: answer.ok, durationMs: Math.round(performance.now() - started), headers: answer.headers, body: answer.body, size };
+  }
   const res = await fetch(`${API_URL}/api/v1${path}`, {
     method: init.method ?? 'GET',
     headers: { Authorization: `Bearer ${token}`, ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}) },

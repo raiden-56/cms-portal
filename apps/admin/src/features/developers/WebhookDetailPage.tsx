@@ -35,6 +35,8 @@ import type { Page as Paged, WebhookDelivery } from '@/lib/types';
 import { toast } from '@/store';
 import { DeliveryStatusPill, NoAccess, isInFlight, useWebhooks } from './shared';
 import { WebhookFormDialog } from './WebhookForm';
+import { GuestNote } from '@/features/guest/guest';
+import { isGuestMode } from '@/lib/guest';
 
 type StatusFilter = 'ALL' | WebhookDelivery['status'];
 
@@ -137,7 +139,7 @@ export default function WebhookDetailPage() {
       setStatus('ALL');
       setPage(1);
       await refresh();
-      toast.success('Test event queued');
+      toast.success(isGuestMode() ? 'Simulated test delivery recorded — nothing was sent' : 'Test event queued');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -147,7 +149,7 @@ export default function WebhookDetailPage() {
     onSuccess: async () => {
       setPage(1);
       await refresh();
-      toast.success('Queued for redelivery');
+      toast.success(isGuestMode() ? 'Simulated redelivery recorded — nothing was sent' : 'Queued for redelivery');
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
@@ -342,7 +344,7 @@ export default function WebhookDetailPage() {
                             </IconButton>
                           </TableCell>
                           <TableCell>
-                            <DeliveryStatusPill status={delivery.status} />
+                            <DeliveryStatusPill status={delivery.status} simulated={delivery.payload.simulated === true} />
                           </TableCell>
                           <TableCell>
                             <Mono>{delivery.event}</Mono>

@@ -56,6 +56,7 @@ import { toast } from '@/store';
 import { ActivityPanel, CommentsPanel, InfoPanel, VersionsPanel } from './EntryPanels';
 import { NoteDialog, ProblemAlert, ScheduleDialog } from './dialogs';
 import { snapshotOf, toPayload, useContentType, useInvalidateContent, useMembers } from './hooks';
+import { GuestNote } from '@/features/guest/guest';
 
 export default function EntryEditorPage() {
   const { typeId, entryId } = useParams();
@@ -1105,6 +1106,9 @@ function EditorForm({ type, entry }: { type: ContentType; entry: EntryDetail | n
         <DialogTitle id="preview-title">Preview this draft</DialogTitle>
         <DialogContent>
           <Stack spacing={3.5} sx={{ pt: 1 }}>
+            <GuestNote>
+              Guest mode: the demo project’s website does not exist and there is no server, so neither link below leads anywhere. The token itself is real inside this browser — the API explorer’s <code>GET /preview</code> request accepts it.
+            </GuestNote>
             {preview?.previewUrl ? (
               <>
                 <Typography variant="body2" color="text.secondary">

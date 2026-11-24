@@ -42,6 +42,7 @@ import { toast } from '@/store';
 import { FONT_MONO } from '@/theme/theme';
 import { EnvironmentLabel, NoAccess, SecretBox, Snippets, TOKEN_TYPE_INFO, TokenTypePill, isConnected, useTokens } from './shared';
 import { FRAMEWORKS, type Framework, envSnippet, frameworkInfo, installSnippet, sampleSnippets, snippetContext } from './snippets';
+import { GuestNote } from '@/features/guest/guest';
 
 const STEPS = ['Framework', 'Environment', 'Access', 'Credentials', 'Install', 'Sample code', 'Test connection', 'Verify content', 'Connected'] as const;
 
@@ -534,6 +535,10 @@ export default function IntegrationsPage() {
   return (
     <Page>
       <PageHeader title="Integrations" description="Connect websites and apps to this project. Several applications can share one project, each with its own key." />
+
+      <GuestNote sx={{ mb: 4 }}>
+        Guest mode: a key made here works only inside this browser, so a website of yours cannot connect with it. The wizard can still verify a read-only key, because that check runs in the browser. A server-side key (read/write or preview) would have to be called from your own server, which cannot reach this demo.
+      </GuestNote>
 
       <Section title="Connected applications" description="Applications are identified by the API key they use. A key is connected once it has called the API." flush sx={{ mb: 5 }}>
         {tokens.isLoading ? (

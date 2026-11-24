@@ -21,6 +21,7 @@ import { CredentialBar, useExplorerKey } from './explorer/parts';
 import { ReferencePanel } from './explorer/ReferencePanel';
 import { RestPanel } from './explorer/RestPanel';
 import { NoAccess } from './shared';
+import { GuestNote } from '@/features/guest/guest';
 
 type ExplorerTab = 'rest' | 'graphql' | 'reference';
 
@@ -146,6 +147,10 @@ export default function ApiExplorerPage() {
           </Button>
         }
       />
+
+      <GuestNote sx={{ mb: 4 }}>
+        Guest mode: requests are answered inside your browser by the demo backend, with the same rules as the delivery API. The base URL is only where a real server would be, and a key created here works nowhere else. GraphQL is executed by the server, so it is not available in guest mode.
+      </GuestNote>
 
       <CredentialBar apiKey={apiKey} onChange={setApiKey} />
 

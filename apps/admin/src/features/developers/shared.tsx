@@ -300,7 +300,9 @@ const DELIVERY_TONE: Record<string, { fg: string; bg: string; label: string }> =
   PENDING: { fg: 'text.secondary', bg: 'surface.sunken', label: 'Queued' },
 };
 
-export function DeliveryStatusPill({ status }: { status: string }) {
+export function DeliveryStatusPill({ status, simulated }: { status: string; simulated?: boolean }) {
+  // Guest mode records the delivery a server would have attempted; nothing was sent, so it is never shown as delivered.
+  if (simulated) return <Pill label="Simulated" dot title="Recorded in guest mode. No request was sent to the endpoint." />;
   const tone = DELIVERY_TONE[status] ?? DELIVERY_TONE.PENDING;
   return <Pill label={tone.label} fg={tone.fg} bg={tone.bg} dot />;
 }
